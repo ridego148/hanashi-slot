@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>お題ちょーだい</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f4f0; --surface: #ffffff; --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --text: #1a1a18; --text2: #666660; --text3: #999994;
+    --accent: #534AB7; --accent-light: #EEEDFE; --accent-mid: #7F77DD;
+    --pink: #D4537E; --pink-light: #FBEAF0;
+    --radius-md: 8px; --radius-lg: 12px; --slot-h: 100px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --surface: #262624; --surface2: #2e2e2b;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.2);
+      --text: #f0efe9; --text2: #9e9e96; --text3: #666660;
+      --accent: #7F77DD; --accent-light: #26215C; --accent-mid: #AFA9EC;
+      --pink: #ED93B1; --pink-light: #4B1528;
+    }
+  }
+  body {
+    font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'BIZ UDPGothic', 'M PLUS Rounded 1c', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 2rem 1rem 4rem;
+  }
+  header { text-align: center; margin-bottom: 2rem; }
+  header h1 { font-size: 32px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 6px; }
+  header p { font-size: 14px; color: var(--text2); }
+  #app { width: 100%; max-width: 560px; display: flex; flex-direction: column; }
+
+  /* 設定ボタン */
+  #btn-settings {
+    position: fixed; top: 1rem; right: 1rem;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--surface); border: 0.5px solid var(--border2);
+    font-size: 18px; cursor: pointer; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.3s; color: var(--text3);
+  }
+  #btn-settings:hover { color: var(--text2); }
+  #btn-settings.open { transform: rotate(90deg); }
+
+  /* 設定オーバーレイ */
+  #settings-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4); z-index: 200;
+  }
+  #settings-overlay.open { display: block; }
+
+  /* 設定パネル */
+  #settings-panel {
+    position: fixed; bottom: 1.5rem; left: 50%;
+    transform: translateX(-50%) translateY(calc(100% + 1.5rem));
+    width: calc(100% - 2rem); max-width: 520px;
+    background: var(--surface); border-radius: 16px;
+    z-index: 201; transition: transform 0.32s cubic-bezier(.22,.61,.36,1);
+    max-height: 80vh; overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  }
+  #settings-panel.open { transform: translateX(-50%) translateY(0); }
+  #settings-drag-handle { width: 36px; height: 4px; background: var(--border2); border-radius: 999px; margin: 12px auto 0; }
+  #settings-title-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px; font-size: 16px; font-weight: 500;
+    border-bottom: 0.5px solid var(--border);
+  }
+  #btn-settings-close {
+    background: none; border: none; font-size: 18px; cursor: pointer;
+    color: var(--text3); font-family: inherit; padding: 0;
+  }
+  #btn-settings-close:hover { color: var(--text); }
+  .setting-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 13px 20px; border-bottom: 0.5px solid var(--border); gap: 16px;
+  }
+  .setting-row.no-border { border-bottom: none; }
+  .setting-info { flex: 1; }
+  .setting-label { font-size: 14px; color: var(--text); margin-bottom: 2px; }
+  .setting-desc { font-size: 11px; color: var(--text3); }
+  .setting-sub { padding: 8px 20px 12px; border-bottom: 0.5px solid var(--border); }
+  .setting-sub-label { font-size: 12px; color: var(--text3); margin-right: 8px; }
+  .setting-sub input[type=number] {
+    width: 60px; padding: 5px 8px; font-size: 14px; font-family: inherit;
+    background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-md); color: var(--text); text-align: center; outline: none;
+  }
+  .setting-sub-unit { font-size: 12px; color: var(--text3); margin-left: 4px; }
+
+  /* トグルスイッチ */
+  .toggle-switch { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-track {
+    position: absolute; inset: 0; background: var(--border2);
+    border-radius: 999px; cursor: pointer; transition: background 0.2s;
+  }
+  .toggle-track::before {
+    content: ''; position: absolute; height: 20px; width: 20px;
+    left: 3px; top: 3px; background: white; border-radius: 50%;
+    transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-switch input:checked + .toggle-track { background: var(--accent); }
+  .toggle-switch input:checked + .toggle-track::before { transform: translateX(18px); }
+
+  /* セグメントコントロール */
+  .seg-ctrl {
+    display: flex; border: 0.5px solid var(--border2);
+    border-radius: var(--radius-md); overflow: hidden;
+  }
+  .seg-btn {
+    flex: 1; padding: 7px 4px; font-size: 12px; font-family: inherit;
+    background: none; border: none; cursor: pointer; color: var(--text2);
+    transition: all 0.12s; border-right: 0.5px solid var(--border2);
+  }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn.on { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+
+  /* カウンター */
+  #counter-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  #counter-bar span { font-size: 12px; color: var(--text3); }
+  #fav-badge {
+    display: none; align-items: center; gap: 3px;
+    font-size: 12px; font-family: inherit; font-weight: 500;
+    color: var(--pink); background: var(--pink-light);
+    border: 0.5px solid var(--pink); border-radius: 999px;
+    padding: 2px 10px; cursor: pointer; transition: opacity 0.15s;
+  }
+  #fav-badge.visible { display: flex; }
+  #fav-badge:hover { opacity: 0.75; }
+  #counter-val { font-size: 12px; font-weight: 500; color: var(--text2); }
+
+  /* ストリークバー */
+  #streak-bar { font-size: 11px; color: var(--text3); text-align: center; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  #btn-reset-stats { font-size: 10px; color: var(--text3); background: none; border: none; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
+  #btn-reset-stats:hover { color: var(--pink); }
+
+  /* タイマー */
+  #timer-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  #timer-track { flex: 1; height: 4px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+  #timer-progress { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.9s linear, background 0.3s; }
+  #timer-sec-display { font-size: 12px; color: var(--text3); min-width: 28px; text-align: right; }
+
+  /* スロット本体 */
+  #slot-wrap {
+    border: 0.5px solid var(--border2); border-radius: var(--radius-lg);
+    background: var(--surface); overflow: hidden; position: relative;
+    height: var(--slot-h); margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: center;
+    transition: box-shadow 0.15s;
+  }
+  #slot-wrap::before, #slot-wrap::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 32px;
+    pointer-events: none; z-index: 2;
+  }
+  #slot-wrap::before { top: 0; background: linear-gradient(to bottom, var(--surface), transparent); }
+  #slot-wrap::after  { bottom: 0; background: linear-gradient(to top, var(--surface), transparent); }
+  #highlight {
+    position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    height: var(--slot-h); border-top: 1.5px solid var(--accent-mid);
+    border-bottom: 1.5px solid var(--accent-mid); pointer-events: none; z-index: 1; transition: border-color 0.15s;
+  }
+  #highlight.spinning-glow { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-light); }
+  #drum { width: 100%; padding: 0 1.5rem; }
+  .slot-item {
+    height: var(--slot-h); display: flex; align-items: center; justify-content: center;
+    font-size: clamp(15px, 4vw, 21px); font-weight: 500; color: var(--text);
+    text-align: center; line-height: 1.4; padding: 0 0.5rem;
+    user-select: none; will-change: transform, filter;
+  }
+  .slot-item.blurring { filter: blur(1.5px); }
+  @keyframes land { 0%{transform:scale(1.09)} 55%{transform:scale(0.95)} 100%{transform:scale(1)} }
+  .slot-item.landing { animation: land 0.38s cubic-bezier(.22,.61,.36,1); }
+  @keyframes flash-border { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 0 3px var(--pink)} }
+  #slot-wrap.flashing { animation: flash-border 0.3s ease-in-out 3; }
+
+  /* 2択カード */
+  #choice-section { margin-bottom: 12px; }
+  #choice-cards { display: flex; gap: 8px; }
+  .choice-card {
+    flex: 1; background: var(--surface); border: 1.5px solid var(--accent-mid);
+    border-radius: var(--radius-lg); padding: 12px 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+  }
+  .choice-text { font-size: clamp(13px, 3.5vw, 16px); font-weight: 500; color: var(--text); line-height: 1.4; flex: 1; display: flex; align-items: center; justify-content: center; }
+  .choice-btn {
+    padding: 8px 0; font-size: 13px; font-family: inherit;
+    background: var(--accent); color: #fff; border: none;
+    border-radius: var(--radius-md); cursor: pointer; transition: opacity 0.15s; width: 100%;
+  }
+  .choice-btn:hover { opacity: 0.85; }
+
+  /* ボタン行 */
+  #btn-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  #btn-spin {
+    flex: 1; padding: 15px; font-size: 16px; font-weight: 500; font-family: inherit;
+    border: none; border-radius: var(--radius-md); background: var(--accent); color: #fff;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s; letter-spacing: 0.04em;
+  }
+  #btn-spin:hover { opacity: 0.87; }
+  #btn-spin:active { transform: scale(0.97); }
+  #btn-spin:disabled { opacity: 0.38; cursor: not-allowed; }
+  .multi-btn {
+    flex: 1; padding: 15px 6px; font-size: 15px; font-weight: 500; font-family: inherit;
+    border: 1.5px solid var(--accent-mid); border-radius: var(--radius-md);
+    background: var(--accent-light); color: var(--accent);
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s; letter-spacing: 0.02em;
+  }
+  .multi-btn:hover { opacity: 0.8; }
+  .multi-btn:active { transform: scale(0.97); }
+  .multi-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ステータス */
+  #status { font-size: 12px; color: var(--text3); text-align: center; min-height: 16px; margin-bottom: 12px; }
+  #status .cat-badge {
+    display: inline-block; background: var(--accent-light); color: var(--accent);
+    font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 500;
+  }
+
+  /* 深掘りヒント */
+  #hint-section {
+    background: var(--accent-light); border-radius: var(--radius-lg);
+    padding: 10px 14px; margin-bottom: 14px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  #hint-text { font-size: 13px; color: var(--accent); flex: 1; }
+  #btn-next-hint {
+    font-size: 11px; color: var(--accent); background: none; border: none;
+    cursor: pointer; font-family: inherit; white-space: nowrap; padding: 0; flex-shrink: 0;
+  }
+  #btn-next-hint:hover { opacity: 0.7; }
+
+  /* カテゴリフィルター */
+  #filter-section {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg); padding: 12px 14px; margin-bottom: 14px;
+  }
+  #filter-title {
+    font-size: 11px; color: var(--text3); margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #btn-all, #btn-none { font-size: 11px; color: var(--accent); background: none; border: none; cursor: pointer; font-family: inherit; padding: 0; }
+  #btn-all:hover, #btn-none:hover { opacity: 0.7; }
+  #btn-none { color: var(--text3); }
+  #category-row { display: flex; flex-wrap: wrap; gap: 5px; }
+  .cat-btn {
+    font-size: 11px; padding: 3px 9px; border: 0.5px solid var(--border);
+    border-radius: 999px; background: var(--surface2); color: var(--text2);
+    cursor: pointer; font-family: inherit; transition: all 0.12s;
+  }
+  .cat-btn:hover { border-color: var(--border2); color: var(--text); }
+  .cat-btn.on { background: var(--accent-light); color: var(--accent); border-color: var(--accent-mid); }
+
+  /* カスタムお題 */
+  #custom-section {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg); padding: 12px 14px; margin-bottom: 14px;
+  }
+  #custom-toggle {
+    width: 100%; display: flex; justify-content: space-between; align-items: center;
+    background: none; border: none; cursor: pointer; font-family: inherit; padding: 0;
+    color: var(--text3); font-size: 11px;
+  }
+  #custom-toggle:hover { color: var(--text2); }
+  #custom-toggle-icon { font-size: 10px; transition: transform 0.2s; display: inline-block; }
+  #custom-toggle-icon.open { transform: rotate(180deg); }
+  #custom-body { display: none; margin-top: 10px; }
+  #custom-body.open { display: block; }
+  #custom-input-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  #custom-text {
+    flex: 1; padding: 7px 10px; font-size: 13px; font-family: inherit;
+    background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-md); color: var(--text); outline: none;
+  }
+  #custom-text:focus { border-color: var(--accent-mid); }
+  #custom-cat-input {
+    padding: 7px 8px; font-size: 12px; font-family: inherit;
+    background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-md); color: var(--text2); outline: none; width: 90px;
+  }
+  #custom-cat-input:focus { border-color: var(--accent-mid); }
+  #btn-add-topic {
+    padding: 7px 12px; font-size: 12px; font-family: inherit;
+    background: var(--accent); color: #fff; border: none;
+    border-radius: var(--radius-md); cursor: pointer; white-space: nowrap; transition: opacity 0.15s;
+  }
+  #btn-add-topic:hover { opacity: 0.85; }
+  #custom-list { display: flex; flex-direction: column; gap: 4px; }
+  .custom-item {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; padding: 6px 8px; background: var(--surface2);
+    border-radius: var(--radius-md); gap: 8px; border-left: 2px solid var(--accent-mid);
+  }
+  .custom-item-text { flex: 1; color: var(--text); }
+  .custom-item-cat { font-size: 10px; color: var(--text3); flex-shrink: 0; }
+  .btn-del-topic {
+    background: none; border: none; color: var(--text3);
+    cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; flex-shrink: 0;
+  }
+  .btn-del-topic:hover { color: var(--pink); }
+  #custom-empty { font-size: 12px; color: var(--text3); text-align: center; padding: 6px 0; }
+
+  /* 履歴 */
+  /* 履歴・お気に入り統合セクション */
+  #log-section {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg); padding: 12px 14px; margin-bottom: 14px;
+  }
+  #log-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  }
+  #log-tabs { display: flex; gap: 0; border: 0.5px solid var(--border2); border-radius: var(--radius-md); overflow: hidden; }
+  .log-tab {
+    padding: 5px 14px; font-size: 12px; font-family: inherit;
+    background: none; border: none; cursor: pointer; color: var(--text3);
+    transition: all 0.12s;
+  }
+  .log-tab.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .log-tab#tab-fav.active { background: var(--pink-light); color: var(--pink); }
+  #log-clear {
+    font-size: 11px; color: var(--text3); background: none;
+    border: none; cursor: pointer; font-family: inherit; padding: 0;
+  }
+  #log-clear:hover { color: var(--text2); }
+  #log-list { display: flex; flex-direction: column; gap: 4px; }
+  .hist-item {
+    font-size: 13px; color: var(--text2); padding: 7px 10px;
+    background: var(--surface2); border-radius: var(--radius-md);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .hist-item-text { flex: 1; }
+  .hist-cat { font-size: 10px; color: var(--text3); flex-shrink: 0; }
+  .btn-hist-fav {
+    background: none; border: none; cursor: pointer; font-size: 15px;
+    color: var(--text3); padding: 0 2px; flex-shrink: 0; line-height: 1;
+    transition: color 0.15s;
+  }
+  .btn-hist-fav.on { color: var(--pink); }
+  .btn-hist-fav:hover { color: var(--pink); }
+  #log-empty { font-size: 13px; color: var(--text3); text-align: center; padding: 10px 0; }
+
+  /* 連ガチャ結果パネル */
+  #multi-section {
+    background: var(--surface); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-lg); padding: 12px 14px;
+    margin-bottom: 14px; display: none;
+  }
+  #multi-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px; font-size: 12px; color: var(--text3);
+  }
+  #btn-close-multi {
+    font-size: 11px; color: var(--text3); background: none;
+    border: none; cursor: pointer; font-family: inherit; padding: 0;
+  }
+  #btn-close-multi:hover { color: var(--text2); }
+  #multi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .multi-item {
+    background: var(--surface2); border-radius: var(--radius-md);
+    padding: 8px 10px; display: flex; align-items: center; gap: 6px;
+    border: 1px solid transparent; transition: border-color 0.12s, background 0.12s;
+  }
+  .multi-item.selected { border-color: var(--accent-mid); background: var(--accent-light); }
+  .multi-item-text {
+    flex: 1; font-size: 12px; color: var(--text); line-height: 1.4;
+    cursor: pointer;
+  }
+  .multi-item-fav {
+    background: none; border: none; font-size: 14px; line-height: 1;
+    color: var(--text3); cursor: pointer; padding: 0; flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .multi-item-fav.on { color: var(--pink); }
+  .multi-item-fav:hover { color: var(--pink); }
+
+  /* トースト */
+  #toast {
+    position: fixed; bottom: 2rem; left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: var(--text); color: var(--bg);
+    padding: 8px 20px; border-radius: 999px; font-size: 13px; opacity: 0;
+    transition: opacity 0.22s, transform 0.22s; pointer-events: none; z-index: 300; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  footer { margin-top: 2.5rem; font-size: 11px; color: var(--text3); text-align: center; }
+</style>
+</head>
+<body>
+
+<button id="btn-settings" aria-label="設定">⚙</button>
+
+<div id="settings-overlay"></div>
+<div id="settings-panel">
+  <div id="settings-drag-handle"></div>
+  <div id="settings-title-row">
+    <span>設定</span>
+    <button id="btn-settings-close">✕</button>
+  </div>
+  <div id="settings-body">
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">🔊 効果音</div>
+        <div class="setting-desc">スピン中・着地・タイマー終了に音を鳴らす</div>
+      </div>
+      <label class="toggle-switch"><input type="checkbox" id="set-sound"><span class="toggle-track"></span></label>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">⏱ タイマーモード</div>
+        <div class="setting-desc">お題が出たらカウントダウン開始</div>
+      </div>
+      <label class="toggle-switch"><input type="checkbox" id="set-timer"><span class="toggle-track"></span></label>
+    </div>
+    <div class="setting-sub" id="timer-sec-row" style="display:none">
+      <span class="setting-sub-label">制限時間</span>
+      <input type="number" id="set-timer-sec" min="10" max="120" step="5" value="30">
+      <span class="setting-sub-unit">秒</span>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">🎚 話題の深さ</div>
+        <div class="setting-desc">ライト＝気軽 / ミドル＝少し個人的 / 全部＝本音まで</div>
+      </div>
+    </div>
+    <div class="setting-sub" style="border-bottom:0.5px solid var(--border)">
+      <div class="seg-ctrl" id="depth-ctrl">
+        <button class="seg-btn" data-val="1">ライト</button>
+        <button class="seg-btn" data-val="2">ミドル</button>
+        <button class="seg-btn on" data-val="3">全部</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">🃏 2択モード</div>
+        <div class="setting-desc">2つのお題が出て好きな方を選ぶ</div>
+      </div>
+      <label class="toggle-switch"><input type="checkbox" id="set-two-choice"><span class="toggle-track"></span></label>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">🔥 ストリーク記録</div>
+        <div class="setting-desc">連続使用日数・今日の問数を表示</div>
+      </div>
+      <label class="toggle-switch"><input type="checkbox" id="set-streak"><span class="toggle-track"></span></label>
+    </div>
+    <div class="setting-row no-border">
+      <div class="setting-info">
+        <div class="setting-label">💡 深掘りヒント</div>
+        <div class="setting-desc">お題に関連するフォローアップ質問を表示</div>
+      </div>
+      <label class="toggle-switch"><input type="checkbox" id="set-hints"><span class="toggle-track"></span></label>
+    </div>
+  </div>
+</div>
+
+<header>
+  <h1>お題ちょーだい</h1>
+  <p>沈黙を破る、万華鏡のようなお題スロット</p>
+</header>
+
+<div id="app">
+  <div id="counter-bar">
+    <span>お題ストック</span>
+    <button id="fav-badge">♥ <span id="fav-badge-count">0</span></button>
+    <span id="counter-val">読み込み中...</span>
+  </div>
+  <div id="streak-bar" style="display:none"></div>
+  <div id="timer-wrap" style="display:none">
+    <div id="timer-track"><div id="timer-progress"></div></div>
+    <span id="timer-sec-display"></span>
+  </div>
+  <div id="slot-wrap" aria-live="polite" aria-atomic="true">
+    <div id="highlight"></div>
+    <div id="drum"><div class="slot-item" id="current-item">ボタンを押してガチャを回そう！</div></div>
+  </div>
+  <div id="choice-section" style="display:none">
+    <div id="choice-cards">
+      <div class="choice-card">
+        <div class="choice-text" id="choice-text-a"></div>
+        <button class="choice-btn" id="choice-btn-a">これ！</button>
+      </div>
+      <div class="choice-card">
+        <div class="choice-text" id="choice-text-b"></div>
+        <button class="choice-btn" id="choice-btn-b">これ！</button>
+      </div>
+    </div>
+  </div>
+  <div id="btn-row">
+    <button id="btn-spin">🎰 1回</button>
+    <button id="btn-spin5" class="multi-btn">✨ 5連</button>
+    <button id="btn-spin10" class="multi-btn">🎰 10連</button>
+  </div>
+  <div id="multi-section">
+    <div id="multi-header">
+      <span>10連ガチャ結果</span>
+      <button id="btn-close-multi">閉じる ✕</button>
+    </div>
+    <div id="multi-grid"></div>
+  </div>
+  <div id="status"></div>
+  <div id="hint-section" style="display:none">
+    <span id="hint-text"></span>
+    <button id="btn-next-hint">別の質問 →</button>
+  </div>
+  <div id="filter-section">
+    <div id="filter-title">
+      <span>カテゴリで絞り込み</span>
+      <div style="display:flex;gap:8px">
+        <button id="btn-all">すべて選択</button>
+        <button id="btn-none">すべて解除</button>
+      </div>
+    </div>
+    <div id="category-row"></div>
+  </div>
+  <div id="custom-section">
+    <button id="custom-toggle">
+      <span>＋ オリジナルお題を追加</span>
+      <span id="custom-toggle-icon">▼</span>
+    </button>
+    <div id="custom-body">
+      <div id="custom-input-row">
+        <input id="custom-text" type="text" placeholder="お題を入力…" maxlength="60">
+        <input id="custom-cat-input" type="text" list="cat-datalist" placeholder="カテゴリ" maxlength="20">
+        <datalist id="cat-datalist"></datalist>
+        <button id="btn-add-topic">追加</button>
+      </div>
+      <div id="custom-list"><div id="custom-empty">まだありません</div></div>
+    </div>
+  </div>
+  <div id="log-section">
+    <div id="log-header">
+      <div id="log-tabs">
+        <button class="log-tab active" id="tab-hist">履歴</button>
+        <button class="log-tab" id="tab-fav">♥ お気に入り</button>
+      </div>
+      <button id="log-clear">クリア</button>
+    </div>
+    <div id="log-list"><div id="log-empty">まだありません</div></div>
+  </div>
+</div>
+
+<footer>お題は全 <span id="total-count">—</span> 問 ／ カスタマイズして育てよう</footer>
+<div id="toast"></div>
+
+<script>
+// ===== お題データ (l: 1=ライト 2=ミドル 3=ディープ) =====
+const TOPICS = [
+  // 季節 l:1
+  {t:"春と言えば？",c:"季節",l:1},{t:"夏の思い出といえば？",c:"季節",l:1},
+  {t:"秋の楽しみは？",c:"季節",l:1},{t:"冬が好きな理由は？",c:"季節",l:1},
+  {t:"梅雨時にしたいことは？",c:"季節",l:1},{t:"台風の夜に何をする？",c:"季節",l:1},
+  {t:"初雪を見たときの気持ちは？",c:"季節",l:1},{t:"花見のお供は何？",c:"季節",l:1},
+  {t:"夏祭りで外せないものは？",c:"季節",l:1},{t:"秋の食べ物ベスト3は？",c:"季節",l:1},
+  // 食べもの l:1
+  {t:"好きな食べ物は？",c:"食べもの",l:1},{t:"苦手な食べ物は？",c:"食べもの",l:1},
+  {t:"ラーメンといえば何系？",c:"食べもの",l:1},{t:"カレーのトッピングは？",c:"食べもの",l:1},
+  {t:"朝ごはん派？夜ごはん派？",c:"食べもの",l:1},{t:"コンビニで必ず買うものは？",c:"食べもの",l:1},
+  {t:"外食で一番よく行くジャンルは？",c:"食べもの",l:1},{t:"実は隠れた食いしん坊？",c:"食べもの",l:1},
+  {t:"手料理で得意なメニューは？",c:"食べもの",l:1},{t:"スイーツはどこで食べる派？",c:"食べもの",l:1},
+  {t:"珈琲派？紅茶派？緑茶派？",c:"食べもの",l:1},{t:"辛いもの、好き？嫌い？",c:"食べもの",l:1},
+  {t:"最後の晩餐に選ぶ一品は？",c:"食べもの",l:1},{t:"地元の名物料理といえば？",c:"食べもの",l:1},
+  {t:"食べ放題で攻める戦略は？",c:"食べもの",l:1},
+  // 趣味 l:2
+  {t:"好きな音楽ジャンルは？",c:"趣味",l:2},{t:"最近ハマっていることは？",c:"趣味",l:2},
+  {t:"子どものころ好きだった遊びは？",c:"趣味",l:2},{t:"スポーツは観る派？する派？",c:"趣味",l:2},
+  {t:"映画か読書かどちらが好き？",c:"趣味",l:2},{t:"インドア派？アウトドア派？",c:"趣味",l:2},
+  {t:"コレクションしているものはある？",c:"趣味",l:2},{t:"旅行先で必ずすることは？",c:"趣味",l:2},
+  {t:"ひとりカラオケ、行ける？",c:"趣味",l:2},{t:"楽器を弾けたら何がいい？",c:"趣味",l:2},
+  {t:"好きなアーティストは誰？",c:"趣味",l:2},{t:"マンガ・アニメを語るなら？",c:"趣味",l:2},
+  {t:"ゲームをやるとしたら何系？",c:"趣味",l:2},{t:"SNSで一番よく使うのは？",c:"趣味",l:2},
+  {t:"本を読むなら朝・昼・夜？",c:"趣味",l:2},
+  // 旅行 l:2
+  {t:"旅行するならどんな場所？",c:"旅行",l:2},{t:"海外旅行で印象に残っている国は？",c:"旅行",l:2},
+  {t:"温泉に行くなら内湯か露天か？",c:"旅行",l:2},{t:"飛行機の窓側か通路側か？",c:"旅行",l:2},
+  {t:"旅行の荷物は多い？少ない？",c:"旅行",l:2},{t:"旅行でのハプニング体験は？",c:"旅行",l:2},
+  {t:"次に行きたい国・地域は？",c:"旅行",l:2},{t:"一人旅と友人旅行、どっちが好き？",c:"旅行",l:2},
+  {t:"旅先で必ず食べるものは？",c:"旅行",l:2},{t:"旅行中の楽しみ方は？",c:"旅行",l:2},
+  // 生活 l:2
+  {t:"朝型？夜型？",c:"生活",l:2},{t:"睡眠時間は何時間くらいが理想？",c:"生活",l:2},
+  {t:"休日の理想の過ごし方は？",c:"生活",l:2},{t:"掃除は一気にする派？こまめにする派？",c:"生活",l:2},
+  {t:"テレビとネット動画、どっちをよく見る？",c:"生活",l:2},{t:"財布はスリムが好き？大容量が好き？",c:"生活",l:2},
+  {t:"スマホの壁紙は何にしてる？",c:"生活",l:2},{t:"家の中で一番好きな場所は？",c:"生活",l:2},
+  {t:"起きたら最初にすることは？",c:"生活",l:2},{t:"気分転換の方法は？",c:"生活",l:2},
+  {t:"ストレス発散法は？",c:"生活",l:2},{t:"最近買ってよかったものは？",c:"生活",l:2},
+  {t:"自炊する？しない？",c:"生活",l:2},{t:"節約術で実践していることは？",c:"生活",l:2},
+  {t:"スマホを1日何時間使ってる？",c:"生活",l:2},
+  // 自分のこと l:3
+  {t:"子どものころの夢は？",c:"自分のこと",l:3},{t:"自分の長所だと思うことは？",c:"自分のこと",l:3},
+  {t:"最近、成長したと感じる瞬間は？",c:"自分のこと",l:3},{t:"自分をひと言で表すなら？",c:"自分のこと",l:3},
+  {t:"影響を受けた人は？",c:"自分のこと",l:3},{t:"生まれ変わったら何になりたい？",c:"自分のこと",l:3},
+  {t:"座右の銘や好きな言葉は？",c:"自分のこと",l:3},{t:"自分の「こだわり」はどんなこと？",c:"自分のこと",l:3},
+  {t:"人生で一番笑った瞬間は？",c:"自分のこと",l:3},{t:"泣いた映画や本は？",c:"自分のこと",l:3},
+  {t:"もし時間を戻せるなら？",c:"自分のこと",l:3},{t:"10年後の自分に何を言いたい？",c:"自分のこと",l:3},
+  {t:"今チャレンジしてみたいことは？",c:"自分のこと",l:3},{t:"怒ったことはある？どんなとき？",c:"自分のこと",l:3},
+  {t:"自分のトリセツを書くとしたら？",c:"自分のこと",l:3},
+  // 動物 l:1
+  {t:"犬派？猫派？",c:"動物",l:1},{t:"もし動物になれるなら何がいい？",c:"動物",l:1},
+  {t:"ペットを飼うなら何？",c:"動物",l:1},{t:"動物園で必ず見るのは？",c:"動物",l:1},
+  {t:"水族館で好きな生き物は？",c:"動物",l:1},{t:"虫は触れる？触れない？",c:"動物",l:1},
+  {t:"野生動物に会ったら何がしたい？",c:"動物",l:1},{t:"かわいいと思う動物ランキングは？",c:"動物",l:1},
+  {t:"絶対に苦手な生き物は？",c:"動物",l:1},{t:"空想の生き物を作るとしたら？",c:"動物",l:1},
+  // 青春・学生 l:2
+  {t:"学生時代に頑張ったことは？",c:"青春・学生",l:2},{t:"部活か文化系か、どっちだった？",c:"青春・学生",l:2},
+  {t:"学生時代の失敗エピソードは？",c:"青春・学生",l:2},{t:"修学旅行の思い出は？",c:"青春・学生",l:2},
+  {t:"テストで一番困った科目は？",c:"青春・学生",l:2},{t:"学校の先生で印象に残っている人は？",c:"青春・学生",l:2},
+  {t:"放課後はどこで何してた？",c:"青春・学生",l:2},{t:"当時流行っていたものは？",c:"青春・学生",l:2},
+  {t:"クラスでどんなポジションだった？",c:"青春・学生",l:2},{t:"学園祭の思い出は？",c:"青春・学生",l:2},
+  // もしも l:2
+  {t:"もし宝くじが当たったら？",c:"もしも",l:2},{t:"1か月の有給があったら何をする？",c:"もしも",l:2},
+  {t:"無人島に1つ持っていくなら？",c:"もしも",l:2},{t:"タイムマシンがあるなら過去と未来どっちへ？",c:"もしも",l:2},
+  {t:"空が飛べたらまず何をする？",c:"もしも",l:2},{t:"透明人間になったら何をする？",c:"もしも",l:2},
+  {t:"どんな超能力がほしい？",c:"もしも",l:2},{t:"歴史上の人物と話せるなら誰？",c:"もしも",l:2},
+  {t:"異世界に転生したら何の職業？",c:"もしも",l:2},{t:"1日だけ総理大臣になったら何をする？",c:"もしも",l:2},
+  {t:"架空の国をつくるなら国名は？",c:"もしも",l:2},{t:"月に移住するとしたら持っていくものは？",c:"もしも",l:2},
+  {t:"10歳若返ったら何をしたい？",c:"もしも",l:2},{t:"有名人と入れ替わったら誰がいい？",c:"もしも",l:2},
+  {t:"言語が全部わかったら何をする？",c:"もしも",l:2},
+  // 仕事 l:2
+  {t:"仕事で一番大切にしていることは？",c:"仕事",l:2},{t:"仕事と私生活の切り替えは？",c:"仕事",l:2},
+  {t:"働くモチベーションの源は？",c:"仕事",l:2},{t:"会議中についやってしまうことは？",c:"仕事",l:2},
+  {t:"テレワーク派？出社派？",c:"仕事",l:2},{t:"仕事のトラブルでよくあるパターンは？",c:"仕事",l:2},
+  {t:"理想の上司・先輩像は？",c:"仕事",l:2},{t:"転職経験がある？ない？",c:"仕事",l:2},
+  {t:"副業や複業に興味がある？",c:"仕事",l:2},{t:"仕事以外に磨きたいスキルは？",c:"仕事",l:2},
+  // ちょっとひねり l:2
+  {t:"宇宙人は存在すると思う？",c:"ちょっとひねり",l:2},{t:"前世があるとしたら何だと思う？",c:"ちょっとひねり",l:2},
+  {t:"幽霊を信じる？信じない？",c:"ちょっとひねり",l:2},{t:"人生ゲームを自分仕様にするなら？",c:"ちょっとひねり",l:2},
+  {t:"最強の給食メニューは？",c:"ちょっとひねり",l:2},{t:"もし声が出なかったら何で伝える？",c:"ちょっとひねり",l:2},
+  {t:"音楽のない世界に生きるとしたら？",c:"ちょっとひねり",l:2},{t:"自分を色に例えたら？",c:"ちょっとひねり",l:2},
+  {t:"自分を食べ物に例えたら？",c:"ちょっとひねり",l:2},{t:"自分を乗り物に例えたら？",c:"ちょっとひねり",l:2},
+  {t:"笑いのツボはどこ？",c:"ちょっとひねり",l:2},{t:"怖い話と感動話、どっちが好き？",c:"ちょっとひねり",l:2},
+  {t:"サプライズは好き？苦手？",c:"ちょっとひねり",l:2},{t:"人生最大の決断はいつ何だった？",c:"ちょっとひねり",l:3},
+  {t:"この世で一番素晴らしいものは？",c:"ちょっとひねり",l:3},
+  // 推し活 l:2
+  {t:"あなたの推しを教えて！",c:"推し活",l:2},{t:"初めて「推し」と感じた瞬間は？",c:"推し活",l:2},
+  {t:"推しのどんなところが好き？",c:"推し活",l:2},{t:"推しに会ったら何を言いたい？",c:"推し活",l:2},
+  {t:"推し活で一番お金を使ったものは？",c:"推し活",l:2},{t:"推しを布教するひと言フレーズは？",c:"推し活",l:2},
+  {t:"推しのグッズで一番のお気に入りは？",c:"推し活",l:2},{t:"推し活で出会った仲間はいる？",c:"推し活",l:2},
+  {t:"推しへの手紙を書くなら何を伝える？",c:"推し活",l:2},{t:"「この人が推しかも」と気づいた瞬間は？",c:"推し活",l:2},
+  // テクノロジー l:2
+  {t:"テクノロジーで気になる最新ものは？",c:"テクノロジー",l:2},{t:"AIに任せたい仕事は？",c:"テクノロジー",l:2},
+  {t:"スマホなしで生活できる？",c:"テクノロジー",l:2},{t:"ロボットと友達になれると思う？",c:"テクノロジー",l:2},
+  {t:"未来の乗り物といえば？",c:"テクノロジー",l:2},{t:"VRやメタバースに興味がある？",c:"テクノロジー",l:2},
+  {t:"電子書籍と紙の本、どちらが好き？",c:"テクノロジー",l:2},{t:"ChatGPTなどAIを使ったことはある？",c:"テクノロジー",l:2},
+  {t:"将来なくなりそうな仕事は何だと思う？",c:"テクノロジー",l:2},{t:"サブスクで一番コスパがいいと思うものは？",c:"テクノロジー",l:2},
+  // スポーツ l:1
+  {t:"好きなスポーツは？",c:"スポーツ",l:1},{t:"応援しているチームは？",c:"スポーツ",l:1},
+  {t:"学生時代にやっていたスポーツは？",c:"スポーツ",l:1},{t:"スポーツ観戦で一番盛り上がるのは？",c:"スポーツ",l:1},
+  {t:"今からでも始めてみたいスポーツは？",c:"スポーツ",l:1},{t:"マラソンは走れる？走れない？",c:"スポーツ",l:1},
+  {t:"運動するなら朝・昼・夜？",c:"スポーツ",l:1},{t:"オリンピックで好きな競技は？",c:"スポーツ",l:1},
+  {t:"スポーツで感動した瞬間はある？",c:"スポーツ",l:1},{t:"子どもにやらせたいスポーツは？",c:"スポーツ",l:1},
+  // なつかしい l:1
+  {t:"子どものころのあだ名は？",c:"なつかしい",l:1},{t:"小学生のときに夢中になったものは？",c:"なつかしい",l:1},
+  {t:"初めてのアルバイトは？",c:"なつかしい",l:1},{t:"今でも持っている子どものころのものは？",c:"なつかしい",l:1},
+  {t:"懐かしのお菓子といえば？",c:"なつかしい",l:1},{t:"昔流行ったが今はなくなったものは？",c:"なつかしい",l:1},
+  {t:"昔の自分に一言かけるなら？",c:"なつかしい",l:1},{t:"子どものころよく見ていたテレビ番組は？",c:"なつかしい",l:1},
+  {t:"初めて買ったCD・曲は何？",c:"なつかしい",l:1},{t:"小学校の給食で一番好きだったメニューは？",c:"なつかしい",l:1},
+  // エンタメ l:1
+  {t:"好きな映画のジャンルは？",c:"エンタメ",l:1},{t:"最近見た映画や動画は？",c:"エンタメ",l:1},
+  {t:"笑えるドラマ、泣けるドラマ、どっちが好き？",c:"エンタメ",l:1},{t:"好きな芸人のネタといえば？",c:"エンタメ",l:1},
+  {t:"カラオケの十八番は？",c:"エンタメ",l:1},{t:"無人島に3曲だけ持っていくなら？",c:"エンタメ",l:1},
+  {t:"読んだ中で一番好きな本は？",c:"エンタメ",l:1},{t:"最近ハマっている配信サービスは？",c:"エンタメ",l:1},
+  {t:"今一番行きたいライブ・コンサートは？",c:"エンタメ",l:1},
+  // のんびり雑談 l:2
+  {t:"お酒は飲む？飲まない？",c:"のんびり雑談",l:2},{t:"休日の朝はゆっくり？早起き？",c:"のんびり雑談",l:2},
+  {t:"一番リラックスできる空間は？",c:"のんびり雑談",l:2},{t:"ぼーっとするのは得意？苦手？",c:"のんびり雑談",l:2},
+  {t:"最近「ちょっと幸せ」と思った瞬間は？",c:"のんびり雑談",l:2},{t:"今日の天気と気分、リンクしてる？",c:"のんびり雑談",l:2},
+  {t:"雨の日の楽しみ方は？",c:"のんびり雑談",l:2},{t:"今一番欲しいものは？",c:"のんびり雑談",l:2},
+  {t:"無駄遣いしがちなものは？",c:"のんびり雑談",l:2},{t:"今一番悩んでいることは？",c:"のんびり雑談",l:2},
+  {t:"初めてのひとり暮らしの失敗は？",c:"のんびり雑談",l:2},{t:"実は意外と得意なことは？",c:"のんびり雑談",l:2},
+  {t:"なぜかうまくいかないことは？",c:"のんびり雑談",l:2},{t:"今すぐ逃げ出したい場所は？",c:"のんびり雑談",l:2},
+  {t:"「もっと早くやっておけばよかった」ことは？",c:"のんびり雑談",l:2},
+  // 健康 l:2
+  {t:"健康のために意識していることは？",c:"健康",l:2},{t:"マイブームの運動は？",c:"健康",l:2},
+  {t:"疲れたときの回復法は？",c:"健康",l:2},{t:"食事制限したことはある？",c:"健康",l:2},
+  {t:"睡眠の質を上げる工夫は？",c:"健康",l:2},{t:"メンタルを整える方法は？",c:"健康",l:2},
+  {t:"サプリや健康食品は飲んでる？",c:"健康",l:2},{t:"健康診断で引っかかったことはある？",c:"健康",l:2},
+  {t:"一日の水分摂取量を気にしてる？",c:"健康",l:2},{t:"体を動かすのが好き？苦手？",c:"健康",l:2},
+  // ベーシック l:1
+  {t:"好きな季節はいつ？その理由は？",c:"ベーシック",l:1},{t:"血液型は何型？当たってると思う？",c:"ベーシック",l:1},
+  {t:"方言を話せる？どこの？",c:"ベーシック",l:1},{t:"お風呂とシャワー、どっちが多い？",c:"ベーシック",l:1},
+  {t:"左利き？右利き？それとも両利き？",c:"ベーシック",l:1},{t:"出身地と今住んでいる場所は同じ？",c:"ベーシック",l:1},
+  {t:"兄弟・姉妹は何人？",c:"ベーシック",l:1},{t:"自分の名前の由来を知ってる？",c:"ベーシック",l:1},
+  {t:"タイプの人のどこに一番気付く？",c:"ベーシック",l:1},{t:"SNSのプロフィールで一番こだわったことは？",c:"ベーシック",l:1},
+  {t:"自己紹介するときの鉄板ネタは？",c:"ベーシック",l:1},{t:"今この瞬間に食べたいものは？",c:"ベーシック",l:1},
+  {t:"最近、人から言われて嬉しかった言葉は？",c:"ベーシック",l:1},
+  // 恋愛・人間関係 l:3
+  {t:"一目惚れしたことはある？",c:"恋愛・人間関係",l:3},{t:"理想のデートプランは？",c:"恋愛・人間関係",l:3},
+  {t:"好きな人へのアプローチ方法は？",c:"恋愛・人間関係",l:3},{t:"友達と恋人、どちらを優先する？",c:"恋愛・人間関係",l:3},
+  {t:"長続きするカップルの秘訣は？",c:"恋愛・人間関係",l:3},{t:"告白は自分からする派？待つ派？",c:"恋愛・人間関係",l:3},
+  {t:"初デートで行きたい場所は？",c:"恋愛・人間関係",l:3},{t:"嫉妬はする方？しない方？",c:"恋愛・人間関係",l:3},
+  {t:"喧嘩したとき仲直りする方法は？",c:"恋愛・人間関係",l:3},{t:"運命の人はいると思う？",c:"恋愛・人間関係",l:3},
+  // ファッション l:1
+  {t:"ファッションで一番こだわる部分は？",c:"ファッション",l:1},{t:"お気に入りのアイテムは？",c:"ファッション",l:1},
+  {t:"洋服を買うとき何を重視する？",c:"ファッション",l:1},{t:"おしゃれだと思う人のポイントは？",c:"ファッション",l:1},
+  {t:"ファッションで失敗した思い出は？",c:"ファッション",l:1},{t:"季節で一番おしゃれを楽しむのは？",c:"ファッション",l:1},
+  {t:"勝負服といえばどんな服？",c:"ファッション",l:1},{t:"古着やリサイクルショップは使う？",c:"ファッション",l:1},
+  // 料理 l:2
+  {t:"一番よく作る料理は？",c:"料理",l:2},{t:"料理で好きな工程は？",c:"料理",l:2},
+  {t:"失敗した料理のエピソードは？",c:"料理",l:2},{t:"食べてみたい世界の料理は？",c:"料理",l:2},
+  {t:"お菓子作りはする？",c:"料理",l:2},{t:"調味料でこだわりがあるものは？",c:"料理",l:2},
+  {t:"鍋料理の好きな具材ベスト3は？",c:"料理",l:2},{t:"挑戦してみたい料理は？",c:"料理",l:2},
+];
+
+// ===== 深掘りヒント =====
+const HINTS = {
+  '食べもの':     ['それはどこで初めて食べた？','誰と食べるのが一番美味しい？','家でも作れる？'],
+  '趣味':         ['それを始めたきっかけは？','一番の思い出エピソードは？','友達に勧めるとしたら？'],
+  '旅行':         ['その場所でのベストな思い出は？','次はどこに行きたい？','旅のお土産は何を買う？'],
+  '生活':         ['それはいつから始めた習慣？','誰かに影響された？','変えたいと思うことはある？'],
+  '自分のこと':   ['その答えはいつ頃決まった？','昔の自分と今で変わった？','大切な人にはどう話す？'],
+  '季節':         ['その季節の一番好きな瞬間は？','思い出に残る出来事は？','毎年必ずすることはある？'],
+  '動物':         ['実際に触れたことはある？','子どものころから好きだった？','ペットにしたいと思ったことある？'],
+  '青春・学生':   ['今でも連絡を取っている人はいる？','もう一度やり直せるとしたら？','当時の自分に言いたいことは？'],
+  'もしも':       ['本当にそうなったら困ることはある？','周りの人の反応はどうだと思う？','一番先にすることは？'],
+  '仕事':         ['それを大切にし始めたきっかけは？','同僚や友人はどう思ってる？','10年後も同じ考えだと思う？'],
+  'ちょっとひねり':['その答えを選んだ理由は？','誰かに話したことある？','真剣に考えるとどう思う？'],
+  '推し活':       ['最初に知ったときの気持ちは？','推し活で学んだことはある？','周りに布教した経験は？'],
+  'テクノロジー': ['実際に使ったことはある？','10年後はどうなってると思う？','怖いなと思う側面はある？'],
+  'スポーツ':     ['観戦と実践、どちらがより好き？','体が動く限り続けたい？','印象的な試合や選手は？'],
+  'なつかしい':   ['その記憶はいつ思い出す？','今でも懐かしいと感じる？','当時の友達と今でも会う？'],
+  'エンタメ':     ['それを最初に見たのはいつ？','誰かに勧めたことはある？','何度でも見返せる？'],
+  'のんびり雑談': ['それはいつごろからの習慣？','最近変わったことはある？','誰かに相談したことある？'],
+  '健康':         ['それを始めたきっかけは？','効果を実感したことある？','続けるのが難しいことは？'],
+  'ベーシック':   ['その答えを人に話すと、どんな反応をされる？','自分でも意外だと思うことはある？','最近考えが変わったことはある？'],
+  '恋愛・人間関係':['その考えはどこから来てる？','過去の経験が影響してる？','大切な人にも同じ考えを求める？'],
+  'ファッション': ['それはいつから意識し始めた？','誰かの影響を受けた？','今のスタイルに満足してる？'],
+  '料理':         ['そのレシピはどこで覚えた？','誰かに作ってあげたことある？','改善したいポイントはある？'],
+  '_default':     ['それはいつ頃から感じてる？','誰かに話したことある？','もっと詳しく聞かせて！'],
+};
+
+// ===== 設定 =====
+const LS_SETTINGS = 'hanashi_settings';
+const DEFAULT_SETTINGS = { sound:true, timer:false, timerSec:30, depth:3, twoChoice:false, streak:true, hints:true };
+let settings = {...DEFAULT_SETTINGS};
+
+function loadSettings() {
+  try { const s = JSON.parse(localStorage.getItem(LS_SETTINGS)); if(s) settings = {...DEFAULT_SETTINGS,...s}; } catch(e) {}
+}
+function saveSettings() {
+  try { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); } catch(e) {}
+}
+function applySettingsToUI() {
+  document.getElementById('set-sound').checked = settings.sound;
+  document.getElementById('set-timer').checked = settings.timer;
+  document.getElementById('set-timer-sec').value = settings.timerSec;
+  document.getElementById('timer-sec-row').style.display = settings.timer ? '' : 'none';
+  document.getElementById('set-two-choice').checked = settings.twoChoice;
+  document.getElementById('set-streak').checked = settings.streak;
+  document.getElementById('set-hints').checked = settings.hints;
+  document.querySelectorAll('#depth-ctrl .seg-btn').forEach(b => b.classList.toggle('on', +b.dataset.val === settings.depth));
+}
+
+// ===== ストリーク =====
+const LS_STATS = 'hanashi_stats';
+let stats = {totalCount:0, todayCount:0, lastDate:'', streak:0};
+function loadStats() { try { const s = JSON.parse(localStorage.getItem(LS_STATS)); if(s) stats = s; } catch(e) {} }
+function saveStats() { try { localStorage.setItem(LS_STATS, JSON.stringify(stats)); } catch(e) {} }
+function updateStats() {
+  if (!settings.streak) return;
+  const today = new Date().toLocaleDateString('ja-JP');
+  if (stats.lastDate === today) {
+    stats.todayCount++;
+  } else {
+    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('ja-JP');
+    stats.streak = (stats.lastDate === yesterday) ? stats.streak + 1 : 1;
+    stats.todayCount = 1;
+    stats.lastDate = today;
+  }
+  stats.totalCount++;
+  saveStats();
+  renderStreak();
+}
+function renderStreak() {
+  const el = document.getElementById('streak-bar');
+  if (!settings.streak) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `<span>🔥 ${stats.streak}日連続 · 今日 ${stats.todayCount}問 · 累計 ${stats.totalCount}問</span><button id="btn-reset-stats">リセット</button>`;
+  document.getElementById('btn-reset-stats').addEventListener('click', () => {
+    if (!confirm('ストリーク・問題数をリセットしますか？')) return;
+    stats = {totalCount:0, todayCount:0, lastDate:'', streak:0};
+    saveStats(); renderStreak();
+  });
+}
+
+// ===== LocalStorage =====
+const LS_H = 'hanashi_hist', LS_F = 'hanashi_favs', LS_C = 'hanashi_custom';
+let customTopics = [], history = [], favs = [];
+function saveLS() {
+  try { localStorage.setItem(LS_H,JSON.stringify(history)); localStorage.setItem(LS_F,JSON.stringify(favs)); localStorage.setItem(LS_C,JSON.stringify(customTopics)); } catch(e) {}
+}
+function loadLS() {
+  try { history=JSON.parse(localStorage.getItem(LS_H))||[]; favs=JSON.parse(localStorage.getItem(LS_F))||[]; customTopics=JSON.parse(localStorage.getItem(LS_C))||[]; } catch(e) { history=[];favs=[];customTopics=[]; }
+}
+function allTopics() { return TOPICS.concat(customTopics); }
+function allCats()   { return [...new Set(allTopics().map(t=>t.c))]; }
+
+// ===== State =====
+let activeCats = new Set(), pool = [], current = null, spinning = false, choiceMode = false, choiceItems = [null,null];
+
+// ===== Pool =====
+function getFiltered() {
+  if (activeCats.size === 0) return [];
+  let f = allTopics().filter(t => (activeCats.has(t.c) || t.custom) && (t.custom || (t.l||2) <= settings.depth));
+  if (!f.length) f = allTopics().filter(t => activeCats.has(t.c) || t.custom);
+  return f;
+}
+function hasTopics() { return getFiltered().length > 0; }
+function refillPool() { pool = getFiltered().slice().sort(() => Math.random()-0.5); }
+function pickNext() { if (!pool.length) refillPool(); return pool.splice(Math.floor(Math.random()*pool.length),1)[0]; }
+function updateCounter() {
+  const f = getFiltered();
+  document.getElementById('counter-val').textContent = f.length ? `残り ${pool.length} / ${f.length}` : '0問';
+  document.getElementById('btn-spin').disabled = !f.length;
+  document.getElementById('current-item').textContent = f.length ? document.getElementById('current-item').textContent : 'カテゴリを選択してください';
+}
+function updateTotalCount() { document.getElementById('total-count').textContent = allTopics().length; }
+
+// ===== Render =====
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function updateCatDatalist() {
+  document.getElementById('cat-datalist').innerHTML = allCats().map(c=>`<option value="${escHtml(c)}">`).join('');
+}
+function renderCats() {
+  const row = document.getElementById('category-row'); row.innerHTML = '';
+  allCats().forEach(c => {
+    const b = document.createElement('button'); b.className='cat-btn'+(activeCats.has(c)?' on':''); b.textContent=c;
+    b.onclick = () => { if(activeCats.has(c)){if(activeCats.size>1)activeCats.delete(c);}else activeCats.add(c); refillPool();updateCounter();renderCats(); };
+    row.appendChild(b);
+  });
+}
+let logTab = 'hist'; // 'hist' | 'fav'
+
+function renderLog() {
+  const list = document.getElementById('log-list');
+  const items = logTab === 'hist' ? history : favs;
+  list.innerHTML = '';
+  if (!items.length) {
+    list.innerHTML = `<div id="log-empty">${logTab === 'hist' ? 'まだありません' : 'お気に入りはまだありません'}</div>`;
+    return;
+  }
+  items.forEach(item => {
+    const isFav = favs.some(f => f.t === item.t);
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.innerHTML = `<span class="hist-item-text">${escHtml(item.t)}</span><span class="hist-cat">${escHtml(item.c)}</span><button class="btn-hist-fav ${isFav ? 'on' : ''}" data-t="${escHtml(item.t)}">${isFav ? '♥' : '♡'}</button>`;
+    list.appendChild(div);
+  });
+  list.querySelectorAll('.btn-hist-fav').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.t;
+      const src = logTab === 'hist' ? history : favs;
+      const topic = src.find(i => i.t === t) || history.find(i => i.t === t) || favs.find(i => i.t === t);
+      const idx = favs.findIndex(f => f.t === t);
+      if (idx >= 0) { favs.splice(idx, 1); } else if (topic) { favs.unshift(topic); }
+      updateFavBadge(); renderLog(); saveLS();
+    });
+  });
+}
+function updateFavBadge() {
+  const badge = document.getElementById('fav-badge');
+  document.getElementById('fav-badge-count').textContent = favs.length;
+  badge.classList.toggle('visible', favs.length > 0);
+  document.getElementById('tab-fav').textContent = favs.length ? `♥ お気に入り ${favs.length}` : '♥ お気に入り';
+}
+function renderHistory() { if (logTab === 'hist') renderLog(); else updateFavBadge(); }
+function renderFavs()   { updateFavBadge(); if (logTab === 'fav') renderLog(); }
+function renderCustomList() {
+  const list=document.getElementById('custom-list'); list.innerHTML='';
+  if (!customTopics.length) { list.innerHTML='<div id="custom-empty">まだありません</div>'; return; }
+  customTopics.forEach((item,idx) => {
+    const div=document.createElement('div'); div.className='custom-item';
+    div.innerHTML=`<span class="custom-item-text">${escHtml(item.t)}</span><span class="custom-item-cat">${escHtml(item.c)}</span><button class="btn-del-topic" data-idx="${idx}">×</button>`;
+    list.appendChild(div);
+  });
+  list.querySelectorAll('.btn-del-topic').forEach(btn => btn.addEventListener('click', () => {
+    customTopics.splice(+btn.dataset.idx,1); saveLS(); refillPool(); updateCounter(); updateTotalCount(); renderCats(); renderCustomList(); updateCatDatalist();
+  }));
+}
+
+// ===== Audio =====
+let audioCtx = null;
+function getAudioCtx() { if (!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+function playBlip(freq=440, dur=0.05) {
+  if (!settings.sound) return;
+  try { const ctx=getAudioCtx(),o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination); o.type='square';o.frequency.value=freq; g.gain.setValueAtTime(0.06,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur); o.start();o.stop(ctx.currentTime+dur); } catch(e) {}
+}
+function playLand() {
+  if (!settings.sound) return;
+  try { const ctx=getAudioCtx(),o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination); o.type='sine';o.frequency.setValueAtTime(660,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(220,ctx.currentTime+0.22); g.gain.setValueAtTime(0.14,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.25); o.start();o.stop(ctx.currentTime+0.25); } catch(e) {}
+}
+function playTimerEnd() { for(let i=0;i<3;i++) setTimeout(()=>playBlip(880,0.15),i*220); }
+
+// ===== Timer =====
+let timerInterval=null, timerRemaining=0;
+function startTimer() {
+  clearTimerState();
+  if (!settings.timer) return;
+  timerRemaining = settings.timerSec;
+  document.getElementById('timer-wrap').style.display='flex';
+  updateTimerUI();
+  timerInterval = setInterval(() => {
+    timerRemaining--;
+    updateTimerUI();
+    if (timerRemaining <= 0) { clearTimerState(); flashSlot(); playTimerEnd(); }
+  }, 1000);
+}
+function clearTimerState() {
+  if (timerInterval) clearInterval(timerInterval); timerInterval=null;
+  document.getElementById('timer-wrap').style.display='none';
+}
+function updateTimerUI() {
+  const pct = (timerRemaining/settings.timerSec)*100;
+  const bar = document.getElementById('timer-progress');
+  bar.style.width = pct+'%';
+  bar.style.background = timerRemaining<=5 ? 'var(--pink)' : 'var(--accent)';
+  document.getElementById('timer-sec-display').textContent = timerRemaining+'s';
+}
+function flashSlot() {
+  const w=document.getElementById('slot-wrap'); w.classList.add('flashing');
+  setTimeout(()=>w.classList.remove('flashing'), 1000);
+}
+
+// ===== Spin animation =====
+const PHASES = [{count:8,delay:30},{count:6,delay:50},{count:5,delay:70},{count:4,delay:100},{count:3,delay:140},{count:2,delay:190},{count:1,delay:250}];
+const PHASE_FREQS = [800,700,610,520,440,360,280];
+
+async function runSpin(finalItem) {
+  const el=document.getElementById('current-item'), hl=document.getElementById('highlight');
+  el.classList.remove('landing'); el.classList.add('blurring'); hl.classList.add('spinning-glow');
+  for (let pi=0; pi<PHASES.length; pi++) {
+    const {count,delay}=PHASES[pi];
+    const all=allTopics(); for (let i=0;i<count;i++) { el.textContent=all[Math.floor(Math.random()*all.length)].t; playBlip(PHASE_FREQS[pi], delay*0.6/1000); await new Promise(r=>setTimeout(r,delay)); }
+  }
+  el.classList.remove('blurring'); hl.classList.remove('spinning-glow');
+  el.textContent=finalItem.t; void el.offsetWidth; el.classList.add('landing'); playLand();
+}
+
+// ===== Toast =====
+let toastTimer;
+function showToast(msg) { const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2200); }
+
+// ===== Hint =====
+let currentHints=[], hintIdx=0;
+function showHint(item) {
+  if (!settings.hints) { document.getElementById('hint-section').style.display='none'; return; }
+  currentHints = [...(HINTS[item.c]||HINTS['_default'])].sort(()=>Math.random()-0.5);
+  hintIdx=0; renderHint();
+  document.getElementById('hint-section').style.display='';
+}
+function renderHint() { document.getElementById('hint-text').textContent=currentHints[hintIdx%currentHints.length]; }
+
+// ===== Choice mode =====
+function showChoiceMode(a, b) {
+  choiceMode=true; choiceItems=[a,b];
+  document.getElementById('choice-text-a').textContent=a.t;
+  document.getElementById('choice-text-b').textContent=b.t;
+  document.getElementById('choice-section').style.display='';
+  document.getElementById('current-item').textContent='どちらを選ぶ？';
+}
+function exitChoiceMode() {
+  choiceMode=false;
+  document.getElementById('choice-section').style.display='none';
+}
+function onItemSelected(item) {
+  current=item;
+  history.unshift(item); if(history.length>10) history.pop();
+  document.getElementById('status').innerHTML=`<span class="cat-badge">${escHtml(item.c)}</span>`;
+  updateCounter(); renderHistory(); updateStats(); saveLS(); showHint(item);
+  if (settings.timer) startTimer();
+}
+
+// ===== Settings panel =====
+function openSettings()  { document.getElementById('settings-panel').classList.add('open'); document.getElementById('settings-overlay').classList.add('open'); document.getElementById('btn-settings').classList.add('open'); }
+function closeSettings() { document.getElementById('settings-panel').classList.remove('open'); document.getElementById('settings-overlay').classList.remove('open'); document.getElementById('btn-settings').classList.remove('open'); }
+
+function initSettings() {
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('btn-settings-close').addEventListener('click', closeSettings);
+  document.getElementById('settings-overlay').addEventListener('click', closeSettings);
+
+  document.getElementById('set-sound').addEventListener('change', e => { settings.sound=e.target.checked; saveSettings(); });
+  document.getElementById('set-timer').addEventListener('change', e => {
+    settings.timer=e.target.checked;
+    document.getElementById('timer-sec-row').style.display=settings.timer?'':'none';
+    if (!settings.timer) clearTimerState();
+    saveSettings();
+  });
+  document.getElementById('set-timer-sec').addEventListener('change', e => {
+    settings.timerSec=Math.min(120,Math.max(10,parseInt(e.target.value)||30));
+    e.target.value=settings.timerSec; saveSettings();
+  });
+  document.getElementById('set-two-choice').addEventListener('change', e => { settings.twoChoice=e.target.checked; saveSettings(); });
+  document.getElementById('set-streak').addEventListener('change', e => { settings.streak=e.target.checked; renderStreak(); saveSettings(); });
+  document.getElementById('set-hints').addEventListener('change', e => {
+    settings.hints=e.target.checked;
+    if (!settings.hints) document.getElementById('hint-section').style.display='none';
+    else if (current) showHint(current);
+    saveSettings();
+  });
+  document.querySelectorAll('#depth-ctrl .seg-btn').forEach(btn => btn.addEventListener('click', () => {
+    settings.depth=+btn.dataset.val;
+    document.querySelectorAll('#depth-ctrl .seg-btn').forEach(b=>b.classList.toggle('on',b===btn));
+    refillPool(); updateCounter(); saveSettings();
+  }));
+}
+
+// ===== Main spin =====
+document.getElementById('btn-spin').addEventListener('click', async () => {
+  if (spinning) return;
+  if (choiceMode) exitChoiceMode();
+  spinning=true;
+  clearTimerState();
+  if (settings.sound) getAudioCtx();
+  setAllSpinBtns(true);
+  document.getElementById('status').innerHTML='';
+  document.getElementById('hint-section').style.display='none';
+
+  if (settings.twoChoice) {
+    const a=pickNext(), b=pickNext();
+    await runSpin(a);
+    showChoiceMode(a,b);
+  } else {
+    const item=pickNext();
+    await runSpin(item);
+    onItemSelected(item);
+  }
+  spinning=false;
+  setAllSpinBtns(false);
+});
+
+// ===== 連ガチャ共通 =====
+function setAllSpinBtns(disabled) {
+  ['btn-spin','btn-spin5','btn-spin10'].forEach(id => document.getElementById(id).disabled = disabled);
+}
+
+const QUICK_PHASES = [{count:5,delay:40},{count:4,delay:70},{count:3,delay:120},{count:1,delay:200}];
+
+async function runQuickSpin() {
+  const el=document.getElementById('current-item'), hl=document.getElementById('highlight');
+  el.classList.remove('landing'); el.classList.add('blurring'); hl.classList.add('spinning-glow');
+  const all=allTopics();
+  for (const {count,delay} of QUICK_PHASES) {
+    for (let i=0;i<count;i++) { el.textContent=all[Math.floor(Math.random()*all.length)].t; playBlip(600+Math.random()*200,0.04); await new Promise(r=>setTimeout(r,delay)); }
+  }
+  el.classList.remove('blurring'); hl.classList.remove('spinning-glow');
+}
+
+function renderMultiGrid(items) {
+  const grid = document.getElementById('multi-grid');
+  grid.innerHTML = '';
+  items.forEach((item, idx) => {
+    const isFav = favs.some(f => f.t === item.t);
+    const div = document.createElement('div');
+    div.className = 'multi-item' + (current && current.t === item.t ? ' selected' : '');
+    div.dataset.idx = idx;
+    div.innerHTML = `<span class="multi-item-text">${escHtml(item.t)}</span><button class="multi-item-fav ${isFav?'on':''}" data-t="${escHtml(item.t)}">${isFav?'♥':'♡'}</button>`;
+    div.querySelector('.multi-item-text').addEventListener('click', () => {
+      current = item;
+      selectMultiItem(item);
+      grid.querySelectorAll('.multi-item').forEach(d => d.classList.toggle('selected', d.dataset.idx == idx));
+    });
+    div.querySelector('.multi-item-fav').addEventListener('click', btn => {
+      const t = btn.currentTarget.dataset.t;
+      const fidx = favs.findIndex(f => f.t === t);
+      if (fidx >= 0) { favs.splice(fidx, 1); btn.currentTarget.classList.remove('on'); btn.currentTarget.textContent='♡'; }
+      else { favs.unshift(item); btn.currentTarget.classList.add('on'); btn.currentTarget.textContent='♥'; }
+      updateFavBadge(); renderLog(); saveLS();
+    });
+    grid.appendChild(div);
+  });
+}
+
+function selectMultiItem(item) {
+  document.getElementById('current-item').textContent = item.t;
+  document.getElementById('status').innerHTML = `<span class="cat-badge">${escHtml(item.c)}</span>`;
+  if (settings.hints) showHint(item);
+}
+
+async function spinMulti(count) {
+  if (spinning || !hasTopics()) return;
+  spinning = true;
+  setAllSpinBtns(true);
+  document.getElementById('multi-section').style.display = 'none';
+  if (settings.sound) getAudioCtx();
+
+  await runQuickSpin();
+
+  const items = Array.from({length: count}, () => pickNext());
+  current = items[0];
+  document.getElementById('current-item').textContent = items[0].t;
+  void document.getElementById('current-item').offsetWidth;
+  document.getElementById('current-item').classList.add('landing');
+  playLand();
+
+  items.forEach(item => history.unshift(item));
+  if (history.length > 30) history.length = 30;
+
+  selectMultiItem(items[0]);
+  updateCounter();
+  updateStats();
+  renderLog();
+  saveLS();
+
+  document.getElementById('multi-header').querySelector('span').textContent = `${count}連ガチャ結果`;
+  document.getElementById('multi-section').style.display = '';
+  renderMultiGrid(items);
+  document.getElementById('multi-section').scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+  spinning = false;
+  setAllSpinBtns(false);
+}
+
+document.getElementById('btn-spin5').addEventListener('click',  () => spinMulti(5));
+document.getElementById('btn-spin10').addEventListener('click', () => spinMulti(10));
+
+document.getElementById('btn-close-multi').addEventListener('click', () => {
+  document.getElementById('multi-section').style.display = 'none';
+});
+
+document.getElementById('choice-btn-a').addEventListener('click', () => { if(!choiceMode) return; exitChoiceMode(); document.getElementById('current-item').textContent=choiceItems[0].t; onItemSelected(choiceItems[0]); });
+document.getElementById('choice-btn-b').addEventListener('click', () => { if(!choiceMode) return; exitChoiceMode(); document.getElementById('current-item').textContent=choiceItems[1].t; onItemSelected(choiceItems[1]); });
+
+document.getElementById('fav-badge').addEventListener('click', () => {
+  logTab = 'fav';
+  document.getElementById('tab-hist').classList.remove('active');
+  document.getElementById('tab-fav').classList.add('active');
+  renderLog();
+  document.getElementById('log-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+document.getElementById('tab-hist').addEventListener('click', () => {
+  logTab = 'hist';
+  document.getElementById('tab-hist').classList.add('active');
+  document.getElementById('tab-fav').classList.remove('active');
+  renderLog();
+});
+document.getElementById('tab-fav').addEventListener('click', () => {
+  logTab = 'fav';
+  document.getElementById('tab-hist').classList.remove('active');
+  document.getElementById('tab-fav').classList.add('active');
+  renderLog();
+});
+
+document.getElementById('log-clear').addEventListener('click', () => {
+  if (logTab === 'hist') { history = []; } else { favs = []; }
+  updateFavBadge(); renderLog(); saveLS();
+});
+document.getElementById('btn-all').addEventListener('click', () => { allCats().forEach(c=>activeCats.add(c)); refillPool(); updateCounter(); renderCats(); });
+document.getElementById('btn-none').addEventListener('click', () => { activeCats.clear(); pool=[]; updateCounter(); renderCats(); });
+document.getElementById('btn-next-hint').addEventListener('click', () => { hintIdx++; renderHint(); });
+document.getElementById('custom-toggle').addEventListener('click', () => { document.getElementById('custom-body').classList.toggle('open'); document.getElementById('custom-toggle-icon').classList.toggle('open'); });
+
+function addCustomTopic() {
+  const tEl=document.getElementById('custom-text'), cEl=document.getElementById('custom-cat-input');
+  const text=tEl.value.trim(), cat=cEl.value.trim()||'カスタム';
+  if (!text) { showToast('お題を入力してください'); return; }
+  customTopics.unshift({t:text,c:cat,custom:true});
+  if (!activeCats.has(cat)) activeCats.add(cat);
+  tEl.value=''; saveLS(); refillPool(); updateCounter(); updateTotalCount(); renderCats(); renderCustomList(); updateCatDatalist();
+  showToast('お題を追加しました');
+}
+document.getElementById('btn-add-topic').addEventListener('click', addCustomTopic);
+document.getElementById('custom-text').addEventListener('keydown', e => { if(e.key==='Enter') addCustomTopic(); });
+
+document.addEventListener('keydown', e => {
+  if (e.code!=='Space') return;
+  const tag=document.activeElement.tagName;
+  if (tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||tag==='BUTTON') return;
+  e.preventDefault(); if (!spinning) document.getElementById('btn-spin').click();
+});
+
+// ===== 初期化 =====
+loadSettings(); loadLS(); loadStats();
+activeCats=new Set(allCats());
+refillPool(); updateCounter(); updateTotalCount();
+applySettingsToUI(); renderStreak();
+renderCats(); renderLog(); updateFavBadge(); renderCustomList(); updateCatDatalist();
+initSettings();
+</script>
+</body>
+</html>
